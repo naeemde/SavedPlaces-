@@ -1,0 +1,50 @@
+name: Build Unsigned iOS IPA
+
+"on":
+  push:
+    branches: [ main ]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned app (no code signing)
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project SavedPlaces.xcodeproj \
+            -scheme SavedPlaces \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package into .ipa
+        working-directory: ios
+        run: |
+          mkdir -p Payload
+          cp -r "build/Build/Products/Release-iphoneos/SavedPlaces.app" Payload/
+          zip -r SavedPlaces.ipa Payload
+
+      - name: Upload IPA as downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SavedPlaces-ios-ipa
+          path: ios/SavedPlaces.ipa
